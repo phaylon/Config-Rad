@@ -156,12 +156,23 @@ sub _variable_set {
     return 1;
 }
 
+sub _handle_directive {
+    my ($self, $part, $env) = @_;
+    #use Data::Dump qw( pp );
+    #pp $part;
+    return 1
+        if $part->[0] and $part->[0][0] eq 'item_comment';
+    return 0;
+}
+
 sub _construct_hash {
     my ($self, $tree, $env) = @_;
     my ($type, $parts, $loc) = @$tree;
     my $struct = {};
     PART: for my $part (@$parts) {
         my @left = @$part;
+        next PART
+            if $self->_handle_directive($part, $env);
         next PART
             if $self->_variable_set($part, $env);
         my $value = pop @left;

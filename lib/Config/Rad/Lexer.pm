@@ -15,6 +15,8 @@ my @_tokens = (
         ? $_ 
         : [$_->[0], qr{\Q$_->[1]\E}, @{$_}[2 .. $#$_]]
     }
+    ['item_comment', '@#'],
+    ['line_comment', qr{^\#[^\n]*}, discard => 1],
     ['whitespace', qr{\s|\n}, discard => 1],
     ['string', "'", descend => '_tokenize_string_q'],
     ['string', '"', descend => '_tokenize_string_qq'],

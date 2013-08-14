@@ -87,6 +87,24 @@ subtest 'file loading' => sub {
     };
 };
 
+test_ok($rad_default, 'line comments',
+    ['# foo', {}, 'comment at start'],
+    [' # foo', {}, 'comment after whitespace'],
+    ["foo 23; # bar\nbaz 17",
+        { foo => 23, baz => 17 }, 'comment ends at line end'],
+    ["# foo\nbar 23", { bar => 23 }, 'data after comment'],
+);
+
+test_ok($rad_default, 'item comments',
+    ['@# 23; foo 17', { foo => 17 }, 'simple'],
+    ["foo 23, @# bar {\nbaz 17\n};\nqux 99",
+        { foo => 23, qux => 99 }, 'multiline item comment'],
+);
+
+test_err($rad_default, 'item comment errors',
+    ['foo @# 23', qr{Unexpected item_comment token}, 'misplaced'],
+);
+
 my @_hash_topmodes = (
     [$rad_default, 'default topmode (hash)'],
     [$rad_hash, 'hash topmode'],
