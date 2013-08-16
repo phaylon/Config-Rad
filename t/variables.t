@@ -38,12 +38,6 @@ test_err(RAD_DEFAULT, 'variable errors',
             qr{Right side of assignment has to be single value},
             "assigning `$_` failure"],
     } 'foo bar'),
-    ['$foo = 23; $foo = 17',
-        qr{Variable '\$foo' is already defined},
-        'redefined in same scope'],
-    ['$foo = 23; bar [$foo = 17]',
-        qr{Variable '\$foo' is already defined},
-        'redefined in lower scope'],
 );
 
 done_testing;

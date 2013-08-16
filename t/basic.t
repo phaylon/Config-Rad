@@ -72,7 +72,7 @@ test_ok(RAD_DEFAULT, 'runtime elements',
 
 test_err(RAD_DEFAULT, 'generic errors',
     ['foo bar:= {}',
-        qr{Unexpected assign token}, 'unexpected token'],
+        qr{Unexpected assign token `=`}, 'unexpected token'],
     ["foo\nbar\n:\n=\n{}",
         [qr{Unexpected assign token}, 4], 'unexpected multiline'],
     ['? 23', qr{Unable to parse: `\? 23`}, 'unknown char'],

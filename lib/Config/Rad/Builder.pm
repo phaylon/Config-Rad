@@ -4,6 +4,7 @@ package Config::Rad::Builder;
 use Moo;
 use Try::Tiny;
 use Config::Rad::Util qw( fail isa_hash );
+use Scalar::Util qw( weaken );
 
 use namespace::clean;
 
@@ -33,13 +34,29 @@ my %_builtin_fun = (
     },
 );
 
+sub _child_env {
+    my ($self, $env) = @_;
+    return {
+        %$env,
+        func => { %{ $env->{func} || {} } },
+        const => { %{ $env->{const} || {} } },
+        template => { %{ $env->{template} || {} } },
+    };
+}
+
 sub construct {
     my ($self, $tree, $env) = @_;
     my ($type, $value, $loc) = @$tree;
     my $method = "_construct_$type";
-    fail($loc, "Unexpected $type token")
-        unless $self->can($method);
-    return $self->$method($tree, {%$env});
+    unless ($self->can($method)) {
+        fail($loc,
+            "Unexpected $type token",
+            (defined($value) and not ref($value))
+                ? " `$value`"
+                : '',
+        );
+    }
+    return $self->$method($tree, $env);
 }
 
 sub _construct_number {
@@ -51,12 +68,15 @@ sub _construct_array {
     my ($self, $tree, $env) = @_;
     my ($type, $parts, $loc) = @$tree;
     my $struct = [];
+    my $child_env = $self->_child_env($env);
     PART: for my $part (@$parts) {
         next PART
-            if $self->_variable_set($part, $env);
+            if $self->_handle_directive($part, $struct, $child_env);
+        next PART
+            if $self->_variable_set($part, $child_env);
         fail($loc, 'Arrays cannot contain keyed values')
             if @$part > 1;
-        push @$struct, $self->construct($part->[0], $env);
+        push @$struct, $self->construct($part->[0], $child_env);
     }
     return $struct;
 }
@@ -90,14 +110,41 @@ sub _construct_call {
     my ($type, $call, $loc) = @$tree;
     my ($name, $parts) = @$call;
     my $name_str = $name->[1];
+    my $args_env = $self->_child_env($env);
+    my $get_args = sub {
+        my $args = $self->construct(['array', $parts, $loc], $args_env);
+        return @$args;
+    };
+    if (my $template_def = $env->{template}{$name_str}) {
+        my ($vars, $template, $sub_env) = @$template_def;
+        my @args = $get_args->();
+        fail($loc, "Too many arguments for '$name_str'")
+            if @args > @$vars;
+        my $call_env = $self->_child_env($sub_env);
+        my $num = 0;
+        for my $var_def (@$vars) {
+            $num++;
+            my ($var, $default) = @$var_def;
+            my $arg = @args
+                ? shift(@args)
+                : defined($default)
+                ? $self->construct($default, $call_env)
+                : fail($loc,
+                    "Missing required argument $num",
+                    " (`$var`) for '$name_str'",
+                );
+            $call_env->{$var} = $arg;
+        }
+        return $self->construct($template, $call_env);
+    }
     my $callback = $env->{func}{$name_str}
         || $self->functions->{$name_str}
         || $_builtin_fun{$name_str}
         or fail($loc, "Unknown function '$name_str'");
-    my $args_ref = $self->construct(['array', $parts, $loc], $env);
     my $result;
+    my @args = $get_args->();
     try {
-        $result = $callback->(@$args_ref);
+        $result = $callback->(@args);
     }
     catch {
         chomp $_;
@@ -155,37 +202,103 @@ sub _variable_set {
     fail($loc, 'Right side of assignment has to be single value')
         unless @after == 1;
     my $var_name = $before[0][1];
-    fail($loc, "Variable '$var_name' is already defined")
-        if exists $env->{ $var_name };
     $env->{ $var_name } = $self->construct($after[0], $env);
     return 1;
 }
 
 sub _handle_directive {
-    my ($self, $part, $env) = @_;
-    #use Data::Dump qw( pp );
-    #pp $part;
+    my ($self, $part, $struct, $env) = @_;
     return 1
         if $part->[0] and $part->[0][0] eq 'item_comment';
+    if ($part->[0] and $part->[0][0] eq 'directive') {
+        my ($directive, @args) = @$part;
+        my ($type, $value, $loc) = @$directive;
+        (my $name = $value) =~ s{^\@}{};
+        my $method = "_handle_${name}_directive";
+        fail($loc, "Invalid directive `$value`")
+            unless $self->can($method);
+        $self->$method($struct, $env, $loc, @args);
+        return 1;
+    }
     return 0;
+}
+
+my @_seq_assign = qw( variable assign ? );
+
+sub _destruct_signature {
+    my ($self, $outer_loc, $env, $signature) = @_;
+    fail($outer_loc, 'Signature needs to be in form of a call')
+        unless $signature->[0] eq 'call';
+    my (undef, $call, $loc) = @$signature;
+    my ($name, $params) = @$call;
+    $name = $name->[1];
+    my @vars;
+    my $in_optional;
+    for my $param_idx (0 .. $#$params) {
+        my $param_parts = $params->[$param_idx];
+        if ($self->_match_sequence($param_parts, @_seq_assign)) {
+            push @vars, [$param_parts->[0][1], $param_parts->[2]];
+            $in_optional = 1;
+        }
+        elsif ($self->_match_sequence($param_parts, 'variable')) {
+            my $var_name = $param_parts->[0][1];
+            fail($loc,
+                "Required parameter `$var_name` can not come after",
+                ' optional parameters',
+            ) if $in_optional;
+            push @vars, [$var_name];
+        }
+        else {
+            fail($loc,
+                'Parameter specification in signature can only contain',
+                ' variables and default assignments',
+            );
+        }
+    }
+    return $name, \@vars;
+}
+
+sub _match_sequence {
+    my ($self, $parts, @types) = @_;
+    for my $type_idx (0 .. $#types) {
+        my $type = $types[ $type_idx ];
+        last if $type eq '*';
+        return 0 if @$parts < ($type_idx + 1);
+        next if $type eq '?';
+        return 0 if $parts->[$type_idx][0] ne $type;
+    }
+    return @$parts == @types ? 1 : 0;
+}
+
+sub _handle_define_directive {
+    my ($self, undef, $env, $loc, $signature, $template) = @_;
+    fail($loc, 'Missing call signature for `@define`')
+        unless $signature;
+    my ($name, $var) = $self->_destruct_signature($loc, $env, $signature);
+    fail($loc, 'Missing call definition template for `@define`')
+        unless $template;
+    my $sub_env = $self->_child_env($env);
+    $env->{template}{$name} = [$var, $template, $sub_env];
+    return 1;
 }
 
 sub _construct_hash {
     my ($self, $tree, $env) = @_;
     my ($type, $parts, $loc) = @$tree;
     my $struct = {};
+    my $child_env = $self->_child_env($env);
     PART: for my $part (@$parts) {
         my @left = @$part;
         next PART
-            if $self->_handle_directive($part, $env);
+            if $self->_handle_directive($part, $struct, $child_env);
         next PART
-            if $self->_variable_set($part, $env);
+            if $self->_variable_set($part, $child_env);
         my $value = pop @left;
         fail($loc, "Missing hash key names")
             unless @left;
         my $curr = $struct;
         while (my $key = shift @left) {
-            my $str = $self->_construct_auto_string($key, $env);
+            my $str = $self->_construct_auto_string($key, $child_env);
             fail($loc, "Hash key is not a string")
                 if ref $str or not defined $str;
             if (@left) {
@@ -199,7 +312,7 @@ sub _construct_hash {
             else {
                 fail($loc, "Value '$str' is already set")
                     if exists $curr->{$str};
-                $curr->{$str} = $self->construct($value, $env);
+                $curr->{$str} = $self->construct($value, $child_env);
             }
         }
     }
