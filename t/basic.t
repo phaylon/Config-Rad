@@ -266,6 +266,8 @@ test_ok($rad_default, 'variables',
         { bar => { 23 => { baz => 17 } } }, 'in descending keys'],
     ['$foo = bar: { x 23 }; foo $foo',
         { foo => { _ => 'bar', x => 23 } }, 'topicalization value'],
+    ['foo [$bar = 23, $bar]; baz [$bar = 17, $bar]',
+        { foo => [23], baz => [17] }, 'equally named variables'],
 );
 
 test_err($rad_default, 'variable errors',
@@ -281,6 +283,12 @@ test_err($rad_default, 'variable errors',
             qr{Right side of assignment has to be single value},
             "assigning `$_` failure"],
     } 'foo bar'),
+    ['$foo = 23; $foo = 17',
+        qr{Variable '\$foo' is already defined},
+        'redefined in same scope'],
+    ['$foo = 23; bar [$foo = 17]',
+        qr{Variable '\$foo' is already defined},
+        'redefined in lower scope'],
 );
 
 subtest 'functions' => sub {

@@ -154,7 +154,10 @@ sub _variable_set {
             and $before[0][0] eq 'variable';
     fail($loc, 'Right side of assignment has to be single value')
         unless @after == 1;
-    $env->{ $before[0][1] } = $self->construct($after[0], $env);
+    my $var_name = $before[0][1];
+    fail($loc, "Variable '$var_name' is already defined")
+        if exists $env->{ $var_name };
+    $env->{ $var_name } = $self->construct($after[0], $env);
     return 1;
 }
 
