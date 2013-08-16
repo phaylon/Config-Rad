@@ -75,10 +75,11 @@ sub _construct_topicalized {
 }
 
 sub _construct_bareword {
-    my ($self, $tree) = @_;
+    my ($self, $tree, $env) = @_;
     my $const = $tree->[1];
     my $value =
-        exists($self->constants->{$const}) ? $self->constants->{$const}
+        exists($env->{const}{$const}) ? $env->{const}{$const}
+      : exists($self->constants->{$const}) ? $self->constants->{$const}
       : exists($_builtin_const{$const}) ? $_builtin_const{$const}
       : fail($tree->[2], "Unknown constant '$const'");
     return $value;
@@ -89,7 +90,8 @@ sub _construct_call {
     my ($type, $call, $loc) = @$tree;
     my ($name, $parts) = @$call;
     my $name_str = $name->[1];
-    my $callback = $self->functions->{$name_str}
+    my $callback = $env->{func}{$name_str}
+        || $self->functions->{$name_str}
         || $_builtin_fun{$name_str}
         or fail($loc, "Unknown function '$name_str'");
     my $args_ref = $self->construct(['array', $parts, $loc], $env);

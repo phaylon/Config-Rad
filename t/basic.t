@@ -87,6 +87,34 @@ subtest 'file loading' => sub {
     };
 };
 
+subtest 'caching' => sub {
+    my $rad = Config::Rad->new(cache => 1);
+    my ($name, $first_load, $second_load);
+    do {
+        my $tmp = File::Temp->new;
+        $name = $tmp->filename;
+        print $tmp 'foo 23';
+        close $tmp;
+        $first_load = $rad->parse_file($name);
+    };
+    ok not(-e $name), 'file no longer exists';
+    $second_load = $rad->parse_file($name);
+    is_deeply $first_load, { foo => 23 }, 'config file was valid';
+    is_deeply $second_load, $first_load, 'second load is equal';
+};
+
+test_ok($rad_default, 'runtime elements',
+    ['foo rtconst', { foo => 23 }, 'runtime constant', {
+        constants => { rtconst => 23 },
+    }],
+    ['foo $rtvar', { foo => 23 }, 'runtime variable', {
+        variables => { rtvar => 23 },
+    }],
+    ['foo rtfunc()', { foo => 23 }, 'runtime function', {
+        functions => { rtfunc => sub { 23 } },
+    }],
+);
+
 test_ok($rad_default, 'line comments',
     ['# foo', {}, 'comment at start'],
     [' # foo', {}, 'comment after whitespace'],
@@ -514,8 +542,9 @@ sub test_ok {
     my ($rad, $group_title, @tests) = @_;
     subtest $group_title => sub {
         for my $test (@tests) {
-            my ($body, $expected, $title) = @$test;
-            my $struct = $rad->parse_string($body, "test config");
+            my ($body, $expected, $title, $args) = @$test;
+            $args ||= {};
+            my $struct = $rad->parse_string($body, "test config", %$args);
             is_deeply $struct, $expected, $title;
         }
     };
