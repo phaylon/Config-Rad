@@ -2,9 +2,6 @@ use strictures 1;
 use Test::More;
 use Config::Rad::Test;
 
-# TODO
-# template not available inside itself
-
 test_ok(RAD_DEFAULT, 'templates',
     ['@define foo() 23; foo foo()',
         { foo => 23 }, 'no parameters'],
@@ -46,6 +43,9 @@ test_err(RAD_DEFAULT, 'template errors',
     ['@define foo($x) $x; bar foo()',
         qr{Missing required argument 1 \(`\$x`\) for 'foo'},
         'missing required argument'],
+    ['@define foo() 23 17',
+        qr{Too many expressions for `\@define` directive},
+        'too many expressions'],
 );
 
 done_testing;

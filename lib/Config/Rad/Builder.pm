@@ -3,7 +3,7 @@ use strictures 1;
 package Config::Rad::Builder;
 use Moo;
 use Try::Tiny;
-use Config::Rad::Util qw( fail isa_hash );
+use Config::Rad::Util qw( fail fail_nested isa_hash );
 use Scalar::Util qw( weaken );
 
 use namespace::clean;
@@ -148,7 +148,7 @@ sub _construct_call {
     }
     catch {
         chomp $_;
-        fail($loc, "Error in '$name_str' callback: $_\n");
+        fail_nested($loc, "Error in '$name_str' callback", $_);
     };
     return $result;
 }
@@ -270,8 +270,20 @@ sub _match_sequence {
     return @$parts == @types ? 1 : 0;
 }
 
+sub _handle_do_directive {
+    my ($self, undef, $env, $loc, $expr, @rest) = @_;
+    fail($loc, 'Too many expressions for `@do` directive')
+        if @rest;
+    fail($loc, 'Missing expression for `@do` directive')
+        unless $expr;
+    $self->construct($expr, $env);
+    return 1;
+}
+
 sub _handle_define_directive {
-    my ($self, undef, $env, $loc, $signature, $template) = @_;
+    my ($self, undef, $env, $loc, $signature, $template, @rest) = @_;
+    fail($loc, 'Too many expressions for `@define` directive')
+        if @rest;
     fail($loc, 'Missing call signature for `@define`')
         unless $signature;
     my ($name, $var) = $self->_destruct_signature($loc, $env, $signature);
