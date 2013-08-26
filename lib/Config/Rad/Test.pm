@@ -44,6 +44,7 @@ my $functions = {
 my $variables = {
     strobj => TestStringify->new('STROBJ'),
     noval => undef,
+    numval => 17,
 };
 my $constants = {
     bazqux => 23,

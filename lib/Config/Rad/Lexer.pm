@@ -64,7 +64,7 @@ sub _multiline_collapse {
     $lines[-1][-1] =~ s{\s*$}{}
         unless ref $lines[-1][-1];
     my $min_indent = min(map {
-        ($_->[0] =~ m{^\s*$}) ? () : do {
+        (@$_ == 1 and $_->[0] =~ m{^\s*$}) ? () : do {
             $_->[0] =~ m{^(\s*)};
             length($1);
         };
@@ -156,6 +156,7 @@ sub _tokenize_string_qq {
         }
         elsif ($$source =~ s{^\n}{}) {
             if ($multiline) {
+                $push->("\n");
                 push @lines, [@items];
                 @items = ('');
             }

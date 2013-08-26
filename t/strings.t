@@ -19,6 +19,15 @@ test_ok(RAD_DEFAULT, 'single quoted strings',
         { foo => 'bar \\' }, 'backslash escape at end'],
 );
 
+test_ok(RAD_DEFAULT, 'single quoted multiline strings',
+    [qq!foo '''\n    23\n        17\n    99\n  '''!,
+        { foo => "23\n    17\n99\n" },
+        'simple'],
+    [qq!foo '''  \n  23\n 17\n   99'''!,
+        { foo => " 23\n17\n  99" },
+        'whitespace on empty opening line'],
+);
+
 test_err(RAD_DEFAULT, 'single quoted string errors',
     [q{foo 'bar},
         qr{Single quoted string reached end of line without termination},
@@ -37,6 +46,23 @@ test_ok(RAD_DEFAULT, 'double quoted strings',
         { foo => 'bar23qux' }, 'variable interpolation'],
     ['foo "bar \${baz} qux"',
         { foo => 'bar ${baz} qux' }, 'escaped interpolation'],
+);
+
+test_ok(RAD_DEFAULT, 'single quoted multiline strings',
+    [qq!foo """\n    23\n        \${numval}\n    99\n  """!,
+        { foo => "23\n    17\n99\n" },
+        'simple'],
+    [qq!foo """  \n  23\n \${numval}\n   99"""!,
+        { foo => " 23\n17\n  99" },
+        'whitespace on empty opening line'],
+    [q!
+        foo """
+            foo
+                bar\nbaz
+                qux
+        """
+    !, { foo => "foo\n    bar\nbaz\n    qux\n" },
+        'inserted newline characters ignored on realignment'],
 );
 
 test_err(RAD_DEFAULT, 'double quoted string errors',

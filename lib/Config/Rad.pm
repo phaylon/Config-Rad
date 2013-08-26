@@ -187,13 +187,19 @@ Config::Rad - Flexible Configurations
 
 =head2 Arrays
 
-=head2 Values
+=head2 Strings
+
+=head2 Numbers
 
 =head2 Function Calls
 
 =head2 Constants
 
 =head2 Variables
+
+=head2 Comments
+
+=head2 Directives
 
 =head1 METHODS
 
