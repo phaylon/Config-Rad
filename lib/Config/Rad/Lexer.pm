@@ -111,9 +111,11 @@ sub _tokenize_string_q {
             $done .= $1;
         }
     }
+    my $str_type = $multiline ? 'multiline string' : 'string';
+    my $str_end = $multiline ? 'end of input' : 'end of line';
     fail(
         $start_loc,
-        'Single quoted string reached end of line without termination',
+        "Single quoted $str_type reached $str_end without termination",
     );
 }
 
@@ -170,9 +172,11 @@ sub _tokenize_string_qq {
             $push->($1);
         }
     }
+    my $str_type = $multiline ? 'multiline string' : 'string';
+    my $str_end = $multiline ? 'end of input' : 'end of line';
     fail(
         $start_loc,
-        'Double quoted string reached end of line without termination',
+        "Double quoted $str_type reached $str_end without termination",
     );
 }
 

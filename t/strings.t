@@ -35,6 +35,9 @@ test_err(RAD_DEFAULT, 'single quoted string errors',
     [qq{foo 'bar\nbaz'},
         qr{Single quoted string reached end of line without termination},
         'multiline string'],
+    [qq{foo '''bar},
+        qr{Single quoted multiline string reached end of input},
+        'unclosed multiline'],
 );
 
 test_ok(RAD_DEFAULT, 'double quoted strings',
@@ -75,6 +78,9 @@ test_err(RAD_DEFAULT, 'double quoted string errors',
     [qq{foo "bar \\?"},
         qr{Unknown escape sequence '\\\?'},
         'invalid escape'],
+    [qq{foo """bar},
+        qr{Double quoted multiline string reached end of input},
+        'unclosed multiline'],
 );
 
 done_testing;
