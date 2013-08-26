@@ -3,7 +3,12 @@ use strictures 1;
 package Config::Rad::Util;
 use Exporter 'import';
 
-our @EXPORT_OK = qw( fail fail_nested isa_hash );
+our @EXPORT_OK = qw( fail fail_nested isa_hash isa_array );
+
+sub isa_array {
+    die "Not an array reference\n"
+        unless ref $_[0] eq 'ARRAY';
+}
 
 sub isa_hash {
     die "Not a hash reference\n"
@@ -13,7 +18,7 @@ sub isa_hash {
 sub fail_nested {
     my ($loc, $msg, $next) = @_;
     chomp $next;
-    die sprintf "Config Error %s\n\tat %s line %s:\n%s\n",
+    die sprintf "Config Error: %s\n\tat %s line %s:\n%s\n",
         $msg,
         @$loc,
         $next;

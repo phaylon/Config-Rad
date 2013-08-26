@@ -3,7 +3,9 @@ use strictures 1;
 package Config::Rad;
 use Moo;
 use Carp qw( croak );
-use Config::Rad::Util qw( isa_hash );
+use Config::Rad::Util qw( isa_hash isa_array fail );
+use Path::Tiny;
+use Scalar::Util qw( weaken );
 
 use Config::Rad::Lexer;
 use Config::Rad::Parser;
@@ -14,10 +16,11 @@ use namespace::clean;
 our $VERSION = '0.001';
 $VERSION = eval $VERSION;
 
-my $_is_mode = sub {
-    defined($_[0]) and ($_[0] eq 'hash' or $_[0] eq 'array');
-};
+my %_valid_mode = map { ($_, 1) } qw( hash array nodata );
 
+my $_is_mode = sub {
+    defined($_[0]) and $_valid_mode{$_[0]};
+};
 
 has topmode => (
     is => 'ro',
@@ -28,12 +31,20 @@ has topmode => (
     },
 );
 
+has include_paths => (
+    is => 'ro',
+    default => sub { [] },
+    isa => \&isa_array,
+);
+
 has lexer => (is => 'lazy', init_arg => undef);
 has parser => (is => 'lazy', init_arg => undef);
 has builder => (is => 'lazy', init_arg => undef);
+
 has functions => (is => 'ro', default => sub { {} }, isa => \&isa_hash);
 has constants => (is => 'ro', default => sub { {} }, isa => \&isa_hash);
 has variables => (is => 'ro', default => sub { {} }, isa => \&isa_hash);
+
 has cache => (is => 'ro');
 has cache_store => (is => 'ro', default => sub { {} }, init_arg => undef);
 
@@ -45,7 +56,36 @@ sub _build_builder {
     return Config::Rad::Builder->new(
         functions => $self->functions,
         constants => $self->constants,
+        include_paths => $self->include_paths,
+        loader => do {
+            my $wself = $self;
+            weaken $wself;
+            sub {
+                my ($mode, $struct, $env, $loc, $file) = @_;
+                my $path = $self->_find_include_file($loc, $file);
+                return $self->parse_file(
+                    $path,
+                    topmode => $mode,
+                    _topenv => $env,
+                    _topstruct => $struct,
+                );
+            };
+        },
     );
+}
+
+sub _find_include_file {
+    my ($self, $loc, $file) = @_;
+    my @roots = @{ $self->include_paths };
+    fail($loc, qq{Unable to reference file '$file' without include_paths})
+        unless @roots;
+    for my $root (@roots) {
+        my $path = path($root)->child($file);
+        if (-e $path) {
+            return $path;
+        }
+    }
+    fail($loc, qq{Unable to find file '$file' in include_paths});
 }
 
 sub parse_file {
@@ -93,22 +133,30 @@ sub _construct {
     if ($self->cache) {
         $self->cache_store->{$source_name} = $tree;
     }
-    my $struct = $self->builder
-        ->construct($tree, $self->_make_root_env(%arg));
+    my $struct = $self->builder->construct(
+        $tree,
+        $self->_make_root_env(%arg),
+        _topstruct => $arg{_topstruct},
+    );
     return $struct;
 }
 
 sub _make_root_env {
     my ($self, %arg) = @_;
+    return $arg{_topenv}
+        if defined $arg{_topenv};
     my $rt_func = $arg{functions};
     my $rt_const = $arg{constants};
     my $rt_var = $arg{variables};
-    return {
-        %{ $self->_prefixed_variables($self->variables) },
-        %{ $self->_prefixed_variables($rt_var || {}) },
+    my $env = {
+        var => {
+            %{ $self->_prefixed_variables($self->variables) },
+            %{ $self->_prefixed_variables($rt_var || {}) },
+        },
         func => $rt_func || {},
         const => $rt_const || {},
     };
+    return { %$env, root => $env };
 }
 
 sub _prefixed_variables {

@@ -3,13 +3,14 @@ use strictures 1;
 package Config::Rad::Builder;
 use Moo;
 use Try::Tiny;
-use Config::Rad::Util qw( fail fail_nested isa_hash );
+use Config::Rad::Util qw( fail fail_nested isa_hash isa_array );
 use Scalar::Util qw( weaken );
 
 use namespace::clean;
 
 has functions => (is => 'ro', required => 1, isa => \&isa_hash);
 has constants => (is => 'ro', required => 1, isa => \&isa_hash);
+has loader => (is => 'ro', required => 1);
 
 my %_builtin_const = (
     true => 1,
@@ -41,11 +42,12 @@ sub _child_env {
         func => { %{ $env->{func} || {} } },
         const => { %{ $env->{const} || {} } },
         template => { %{ $env->{template} || {} } },
+        var => { %{ $env->{var} || {} } },
     };
 }
 
 sub construct {
-    my ($self, $tree, $env) = @_;
+    my ($self, $tree, $env, %arg) = @_;
     my ($type, $value, $loc) = @$tree;
     my $method = "_construct_$type";
     unless ($self->can($method)) {
@@ -56,7 +58,7 @@ sub construct {
                 : '',
         );
     }
-    return $self->$method($tree, $env);
+    return $self->$method($tree, $env, %arg);
 }
 
 sub _construct_number {
@@ -64,14 +66,27 @@ sub _construct_number {
     return 0 + $item->[1];
 }
 
-sub _construct_array {
-    my ($self, $tree, $env) = @_;
+sub _construct_nodata {
+    my ($self, $tree, $env, %arg) = @_;
     my ($type, $parts, $loc) = @$tree;
-    my $struct = [];
+    PART: for my $part (@$parts) {
+        next PART if $self
+            ->_handle_directive('nodata', $part, undef, $env);
+        next PART
+            if $self->_variable_set($part, $env);
+        fail($loc, 'Cannot construct data in data-less environment');
+    }
+    return undef;
+}
+
+sub _construct_array {
+    my ($self, $tree, $env, %arg) = @_;
+    my ($type, $parts, $loc) = @$tree;
+    my $struct = $arg{_topstruct} || [];
     my $child_env = $self->_child_env($env);
     PART: for my $part (@$parts) {
-        next PART
-            if $self->_handle_directive($part, $struct, $child_env);
+        next PART if $self
+            ->_handle_directive('array', $part, $struct, $child_env);
         next PART
             if $self->_variable_set($part, $child_env);
         fail($loc, 'Arrays cannot contain keyed values')
@@ -133,7 +148,7 @@ sub _construct_call {
                     "Missing required argument $num",
                     " (`$var`) for '$name_str'",
                 );
-            $call_env->{$var} = $arg;
+            $call_env->{var}{$var} = $arg;
         }
         return $self->construct($template, $call_env);
     }
@@ -173,8 +188,8 @@ sub _construct_variable {
     my ($self, $tree, $env) = @_;
     my ($type, $name, $loc) = @$tree;
     fail($loc, "Unknown variable '$name'")
-        unless exists $env->{$name};
-    return $env->{$name};
+        unless exists $env->{var}{$name};
+    return $env->{var}{$name};
 }
 
 sub _variable_set {
@@ -202,12 +217,12 @@ sub _variable_set {
     fail($loc, 'Right side of assignment has to be single value')
         unless @after == 1;
     my $var_name = $before[0][1];
-    $env->{ $var_name } = $self->construct($after[0], $env);
+    $env->{var}{ $var_name } = $self->construct($after[0], $env);
     return 1;
 }
 
 sub _handle_directive {
-    my ($self, $part, $struct, $env) = @_;
+    my ($self, $mode, $part, $struct, $env) = @_;
     return 1
         if $part->[0] and $part->[0][0] eq 'item_comment';
     if ($part->[0] and $part->[0][0] eq 'directive') {
@@ -217,7 +232,7 @@ sub _handle_directive {
         my $method = "_handle_${name}_directive";
         fail($loc, "Invalid directive `$value`")
             unless $self->can($method);
-        $self->$method($struct, $env, $loc, @args);
+        $self->$method($mode, $struct, $env, $loc, @args);
         return 1;
     }
     return 0;
@@ -271,7 +286,7 @@ sub _match_sequence {
 }
 
 sub _handle_do_directive {
-    my ($self, undef, $env, $loc, $expr, @rest) = @_;
+    my ($self, $mode, undef, $env, $loc, $expr, @rest) = @_;
     fail($loc, 'Too many expressions for `@do` directive')
         if @rest;
     fail($loc, 'Missing expression for `@do` directive')
@@ -281,7 +296,7 @@ sub _handle_do_directive {
 }
 
 sub _handle_define_directive {
-    my ($self, undef, $env, $loc, $signature, $template, @rest) = @_;
+    my ($self, $mode, undef, $env, $loc, $signature, $template, @rest) = @_;
     fail($loc, 'Too many expressions for `@define` directive')
         if @rest;
     fail($loc, 'Missing call signature for `@define`')
@@ -294,15 +309,39 @@ sub _handle_define_directive {
     return 1;
 }
 
+my @_load_merge = (
+    ['func', 'function'],
+    ['template', 'defined function'],
+    ['var', 'variable'],
+);
+
+sub _handle_load_directive {
+    my ($self, $mode, undef, $env, $loc, $file, @rest) = @_;
+    fail($loc, 'Too many expressions for `@load` directive')
+        if @rest;
+    fail($loc, 'Missing path to file for `@load` directive')
+        unless defined $file and length $file;
+    my $load_env = $self->_child_env($env->{root});
+    my $file_path = $self->construct($file, $env);
+    $self->loader->('nodata', undef, $load_env, $loc, $file_path);
+    for my $merge (@_load_merge) {
+        my ($type, $title) = @$merge;
+        for my $name (keys %{ $load_env->{$type} || {} }) {
+            $env->{$type}{$name} = $load_env->{$type}{$name};
+        }
+    }
+    return 1;
+}
+
 sub _construct_hash {
-    my ($self, $tree, $env) = @_;
+    my ($self, $tree, $env, %arg) = @_;
     my ($type, $parts, $loc) = @$tree;
-    my $struct = {};
+    my $struct = $arg{_topstruct} || {};
     my $child_env = $self->_child_env($env);
     PART: for my $part (@$parts) {
         my @left = @$part;
-        next PART
-            if $self->_handle_directive($part, $struct, $child_env);
+        next PART if $self
+            ->_handle_directive('hash', $part, $struct, $child_env);
         next PART
             if $self->_variable_set($part, $child_env);
         my $value = pop @left;
