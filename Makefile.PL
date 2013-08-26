@@ -9,6 +9,9 @@ my %_deps_runtime = (
     'Try::Tiny' => '0.12',
     'strictures' => 1,
     'namespace::clean' => '0.24',
+    'List::Util' => 0,
+    'Scalar::Util' => 0,
+    'Path::Tiny' => '0.021',
 );
 
 my %_deps_tests = (

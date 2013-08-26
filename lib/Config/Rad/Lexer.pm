@@ -3,6 +3,7 @@ use strictures 1;
 package Config::Rad::Lexer;
 use Moo;
 use Config::Rad::Util qw( fail );
+use List::Util qw( min );
 
 use namespace::clean;
 
@@ -19,7 +20,9 @@ my @_tokens = (
     ['directive', qr{ \@ $_rx_ident }x],
     ['line_comment', qr{^\#[^\n]*}, discard => 1],
     ['whitespace', qr{\s|\n}, discard => 1],
+    ['string', "'''", descend => '_tokenize_string_q'],
     ['string', "'", descend => '_tokenize_string_q'],
+    ['string', '"""', descend => '_tokenize_string_qq'],
     ['string', '"', descend => '_tokenize_string_qq'],
     ['hash_open', '{'],
     ['hash_close', '}'],
@@ -49,12 +52,41 @@ my %_escape_qq = (
     '$' => '$',
 );
 
+sub _multiline_collapse {
+    my ($self, $multi, @lines) = @_;
+    return ''
+        unless @lines;
+    return map { (@$_) } @lines
+        unless $multi;
+    $lines[0][0] =~ s{^\s*}{};
+    splice @{ $lines[0] }, 0, 1
+        if @{ $lines[0] } == 1 and $lines[0][0] eq "\n";
+    $lines[-1][-1] =~ s{\s*$}{}
+        unless ref $lines[-1][-1];
+    my $min_indent = min(map {
+        ($_->[0] =~ m{^\s*$}) ? () : do {
+            $_->[0] =~ m{^(\s*)};
+            length($1);
+        };
+    } @lines);
+    return map {
+        my $first = $_->[0];
+        my @rest = @{ $_ }[1 .. $#$_];
+        $first =~ s!^\s{$min_indent}!!;
+        ($first, @rest);
+    } @lines;
+}
+
 sub _tokenize_string_q {
-    my ($self, $source, $loc) = @_;
-    my $done;
+    my ($self, $source, $start_loc, $get_loc, $delim) = @_;
+    my @lines;
+    my $done = '';
+    my $multiline = ($delim eq q('''));
     while (length $$source) {
-        if ($$source =~ s{^'}{}) {
-            return [$done];
+        if ($$source =~ s{^$delim}{}) {
+            push @lines, [$done]
+                if length $done;
+            return [$self->_multiline_collapse($multiline, @lines)];
         }
         elsif ($$source =~ s{^\\(.)}{}) {
             if (exists $_escape_q{$1}) {
@@ -65,7 +97,13 @@ sub _tokenize_string_q {
             }
         }
         elsif ($$source =~ s{^\n}{}) {
-            last;
+            if ($multiline) {
+                push @lines, ["$done\n"];
+                $done = '';
+            }
+            else {
+                last;
+            }
         }
         else {
             $$source =~ s{^(.)}{}
@@ -74,14 +112,16 @@ sub _tokenize_string_q {
         }
     }
     fail(
-        $loc,
+        $start_loc,
         'Single quoted string reached end of line without termination',
     );
 }
 
 sub _tokenize_string_qq {
-    my ($self, $source, $loc) = @_;
+    my ($self, $source, $start_loc, $get_loc, $delim) = @_;
     my @items = ('');
+    my @lines;
+    my $multiline = ($delim eq q("""));
     my $push = sub {
         my ($item) = @_;
         if (ref $item) {
@@ -97,8 +137,11 @@ sub _tokenize_string_qq {
         }
     };
     while (length $$source) {
-        if ($$source =~ s{^"}{}) {
-            return \@items;
+        my $loc = $get_loc->();
+        if ($$source =~ s{^$delim}{}) {
+            push @lines, [@items]
+                if @items;
+            return [$self->_multiline_collapse($multiline, @lines)];
         }
         elsif ($$source =~ s{^\\(.)}{}) {
             if (exists $_escape_qq{$1}) {
@@ -112,7 +155,13 @@ sub _tokenize_string_qq {
             $push->(['variable', "\$$1", $loc]);
         }
         elsif ($$source =~ s{^\n}{}) {
-            last;
+            if ($multiline) {
+                push @lines, [@items];
+                @items = ('');
+            }
+            else {
+                last;
+            }
         }
         else {
             $$source =~ s{^(.)}{}
@@ -121,7 +170,7 @@ sub _tokenize_string_qq {
         }
     }
     fail(
-        $loc,
+        $start_loc,
         'Double quoted string reached end of line without termination',
     );
 }
@@ -141,12 +190,18 @@ sub tokenize {
         TOKEN: for my $token (@_tokens) {
             my ($type, $rx, %arg) = @$token;
             if ($source =~ s{\A($rx)}{}) {
+                my $value = $1;
                 next PARSE
                     if $arg{discard};
                 if (my $method = $arg{descend}) {
                     push @found, [
                         $type,
-                        $self->$method(\$source, $loc),
+                        $self->$method(
+                            \$source,
+                            $loc,
+                            $get_location,
+                            $value,
+                        ),
                         $loc,
                     ];
                 }

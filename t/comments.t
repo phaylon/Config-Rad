@@ -12,7 +12,7 @@ test_ok(RAD_DEFAULT, 'line comments',
 
 test_ok(RAD_DEFAULT, 'item comments',
     ['@@ 23; foo 17', { foo => 17 }, 'simple'],
-    ["foo 23, @# bar {\nbaz 17\n};\nqux 99",
+    ["foo 23, @@ bar {\nbaz 17\n};\nqux 99",
         { foo => 23, qux => 99 }, 'multiline item comment'],
 );
 
