@@ -336,17 +336,28 @@ my @_load_merge = (
 );
 
 sub _handle_load_directive {
-    my ($self, $mode, undef, $env, $loc, $file, @rest) = @_;
+    my ($self, $mode, undef, $env, $loc, $file, $args, @rest) = @_;
     fail($loc, 'Too many expressions for `@load` directive')
         if @rest;
     fail($loc, 'Missing path to file for `@load` directive')
         unless defined $file and length $file;
-    my $load_env = $self->_child_root_env($env);
     my $file_path = $self->construct($file, $env);
-    $self->loader->('nodata', undef, $load_env, $loc, $file_path);
+    fail($loc, 'Path to file for `@load` directive must be defined')
+        unless defined $file_path;
+    my $load_env = $self->_child_root_env($env);
+    $args = (defined($args) ? $self->construct($args, $env) : {});
+    fail($loc, 'Arguments for loaded file have to be in a hash')
+        unless ref $args eq 'HASH';
+    $load_env->{var}{ '$' . $_ } = $args->{$_}
+        for keys %$args;
+    $self->loader->('nodata', undef, $load_env, $loc, $file_path, $args);
     for my $merge (@_load_merge) {
         my ($type, $title) = @$merge;
         for my $name (keys %{ $load_env->{$type} || {} }) {
+            if ($type eq 'var') {
+                (my $varname = $name) =~ s{^\$}{};
+                next if exists $args->{$varname};
+            }
             $env->{$type}{$name} = $load_env->{$type}{$name};
         }
     }

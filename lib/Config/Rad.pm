@@ -523,6 +523,10 @@ variables and templates.
 You will need to pass C<include_paths> to L</new> to be able to load
 external definitions.
 
+The loaded file will only have access to the environment with the
+elements passed to L</new> and the C<parse_*> method that was used.
+Everything defined in the local file will not be available.
+
 Example:
 
     # inc.conf
@@ -532,6 +536,20 @@ Example:
     # main.conf
     @load 'inc.conf';
     value foo($bar);
+
+You can explicitly provide the included file with arguments if you
+want by appending a hash declaration after the file path.
+
+Example:
+
+    # inc.conf
+    @define prefixed($str) "${prefix}: ${str}";
+
+    # main.conf
+    @load 'inc.conf' {
+        prefix 'MyApp';
+    };
+    title prefixed('Some Title');
 
 =head2 Ignoring Data
 
