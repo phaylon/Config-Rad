@@ -63,7 +63,9 @@ sub construct {
 
 sub _construct_number {
     my ($self, $item) = @_;
-    return 0 + $item->[1];
+    my $value = $item->[1];
+    $value =~ s{_}{}g;
+    return 0+$value;
 }
 
 sub _construct_nodata {
@@ -104,7 +106,7 @@ sub _construct_topicalized {
     fail($loc, 'Can only topicalize hash references')
         unless ref($val_hash) eq 'HASH';
     return {
-        _ => $self->_construct_auto_string($topic, $env),
+        $env->{topic} => $self->_construct_auto_string($topic, $env),
         %$val_hash,
     };
 }
@@ -283,6 +285,19 @@ sub _match_sequence {
         return 0 if $parts->[$type_idx][0] ne $type;
     }
     return @$parts == @types ? 1 : 0;
+}
+
+sub _handle_topic_directive {
+    my ($self, $mode, $struct, $env, $loc, $expr, @rest) = @_;
+    fail($loc, 'Too many expressions for `@topic` directive')
+        if @rest;
+    fail($loc, 'Missing expression for `@topic` directive')
+        unless $expr;
+    my $topic = $self->construct($expr, $env);
+    fail($loc, 'Value for `@topic` directive must be defined')
+        unless defined $topic;
+    $env->{topic} = $topic;
+    return 1;
 }
 
 sub _handle_do_directive {

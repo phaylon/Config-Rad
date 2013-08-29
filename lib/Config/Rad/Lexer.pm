@@ -10,6 +10,13 @@ use namespace::clean;
 my $_rx_ident = qr{ [a-z_] [a-z0-9_]* }ix;
 my $_rx_int = qr { [0-9]+ (?: _ [0-9]+ )* }x;
 
+my $_is_num = sub {
+    my ($value, $loc) = @_;
+    fail($loc, 'Numbers cannot start with 0')
+        if $value =~ m{^-?0(?:\d|_)};
+    return 1;
+};
+
 my @_tokens = (
     map {
         ref($_->[1])
@@ -35,7 +42,7 @@ my @_tokens = (
     ['assign', '='],
     ['bareword', $_rx_ident],
     ['variable', qr{ \$ $_rx_ident }x],
-    ['number', qr{ -? $_rx_int (?: \. $_rx_int )? }x],
+    ['number', qr{ -? $_rx_int (?: \. $_rx_int )? }x, check => $_is_num],
 );
 
 my %_escape_q = (
@@ -196,6 +203,9 @@ sub tokenize {
             my ($type, $rx, %arg) = @$token;
             if ($source =~ s{\A($rx)}{}) {
                 my $value = $1;
+                if (my $check = $arg{check}) {
+                    $value->$check($loc);
+                }
                 next PARSE
                     if $arg{discard};
                 if (my $method = $arg{descend}) {
