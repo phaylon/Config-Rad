@@ -4,6 +4,8 @@ use Test::Fatal;
 use File::Temp;
 use Config::Rad::Test;
 
+my @_test_cycles;
+
 subtest 'topmode errors' => sub {
     like exception { Config::Rad->new(topmode => 'list') },
         qr{Must be either 'hash' or 'array'},
@@ -44,6 +46,7 @@ subtest 'file loading' => sub {
 
 subtest 'caching' => sub {
     my $rad = Config::Rad->new(cache => 1);
+    push @_test_cycles, [$rad, 'caching instance'];
     my ($name, $first_load, $second_load);
     do {
         my $tmp = File::Temp->new;
@@ -77,5 +80,7 @@ test_err(RAD_DEFAULT, 'generic errors',
         [qr{Unexpected assign token}, 4], 'unexpected multiline'],
     ['? 23', qr{Unable to parse: `\? 23`}, 'unknown char'],
 );
+
+test_for_cycles(@_test_cycles);
 
 done_testing;

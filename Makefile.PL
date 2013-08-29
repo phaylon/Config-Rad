@@ -17,6 +17,7 @@ my %_deps_runtime = (
 my %_deps_tests = (
     'Test::More' => '0.98',
     'Test::Fatal' => '0.010',
+    'Test::Memory::Cycle' => '1.04',
 );
 
 WriteMakefile(

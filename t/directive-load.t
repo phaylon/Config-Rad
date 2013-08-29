@@ -32,4 +32,6 @@ test_err(RAD_DEFAULT, 'errors in loaded file',
         'loading env not available'],
 );
 
+test_for_cycles;
+
 done_testing;

@@ -88,4 +88,6 @@ test_err(RAD_DEFAULT, 'hash container errors',
         qr{Unclosed hash reached end of input}, 'unclosed hash'],
 );
 
+test_for_cycles;
+
 done_testing;

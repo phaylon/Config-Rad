@@ -20,4 +20,6 @@ test_err(RAD_DEFAULT, 'item comment errors',
     ['foo @@ 23', qr{Unexpected item_comment token}, 'misplaced'],
 );
 
+test_for_cycles;
+
 done_testing;

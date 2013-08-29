@@ -51,7 +51,7 @@ test_ok(RAD_DEFAULT, 'double quoted strings',
         { foo => 'bar ${baz} qux' }, 'escaped interpolation'],
 );
 
-test_ok(RAD_DEFAULT, 'single quoted multiline strings',
+test_ok(RAD_DEFAULT, 'double quoted multiline strings',
     [qq!foo """\n    23\n        \${numval}\n    99\n  """!,
         { foo => "23\n    17\n99\n" },
         'simple'],
@@ -66,6 +66,9 @@ test_ok(RAD_DEFAULT, 'single quoted multiline strings',
         """
     !, { foo => "foo\n    bar\nbaz\n    qux\n" },
         'inserted newline characters ignored on realignment'],
+    [qq!foo """  \n   bar\n\n    baz\n   qux\n"""!,
+        { foo => "bar\n\n baz\nqux\n" },
+        'empty lines in deindentation'],
 );
 
 test_err(RAD_DEFAULT, 'double quoted string errors',
@@ -82,5 +85,7 @@ test_err(RAD_DEFAULT, 'double quoted string errors',
         qr{Double quoted multiline string reached end of input},
         'unclosed multiline'],
 );
+
+test_for_cycles;
 
 done_testing;

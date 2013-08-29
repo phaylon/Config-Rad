@@ -76,4 +76,6 @@ test_err(RAD_DEFAULT, 'errors',
         'unclosed arguments'],
 );
 
+test_for_cycles;
+
 done_testing;

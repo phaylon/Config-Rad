@@ -45,6 +45,9 @@ test_ok(RAD_DEFAULT, 'topicalization',
             { _ => 'baz', x => 17 },
         ] },
         'in array'],
+    ['@topic "id"; foo bar: { x 23 }',
+        { foo => { x => 23, id => 'bar' } },
+        'different topic with @topic directive'],
 );
 
 test_err(RAD_DEFAULT, 'topicalization errors',
@@ -57,5 +60,19 @@ test_err(RAD_DEFAULT, 'topicalization errors',
     ['foo {: {} }', qr{Unexpected topicalization}, 'missing topic'],
     ['foo 23:', qr{Missing topicalized value}, 'missing value'],
 );
+
+test_err(RAD_DEFAULT, '@topic directive errors',
+    ['@topic',
+        qr{Missing expression for `\@topic` directive},
+        'missing expression'],
+    ['@topic 23 17',
+        qr{Too many expressions for `\@topic` directive},
+        'too many expressions'],
+    ['@topic undef',
+        qr{Value for `\@topic` directive must be defined},
+        'undefined topic key'],
+);
+
+test_for_cycles;
 
 done_testing;

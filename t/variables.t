@@ -40,4 +40,6 @@ test_err(RAD_DEFAULT, 'variable errors',
     } 'foo bar'),
 );
 
+test_for_cycles;
+
 done_testing;

@@ -48,4 +48,6 @@ test_err(RAD_DEFAULT, 'template errors',
         'too many expressions'],
 );
 
+test_for_cycles;
+
 done_testing;

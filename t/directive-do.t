@@ -27,4 +27,6 @@ test_err(RAD_DEFAULT, 'errors',
         'too many expressions'],
 );
 
+test_for_cycles([$rad, 'custom function instance']);
+
 done_testing;

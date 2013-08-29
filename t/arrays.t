@@ -46,4 +46,6 @@ test_err(RAD_DEFAULT, 'array container errors',
         qr{Unclosed array reached end of input}, 'unclosed array'],
 );
 
+test_for_cycles;
+
 done_testing;

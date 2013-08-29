@@ -31,4 +31,6 @@ test_err(RAD_DEFAULT, 'errors',
         'unknown constant'],
 );
 
+test_for_cycles;
+
 done_testing;

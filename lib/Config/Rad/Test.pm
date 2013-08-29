@@ -4,12 +4,14 @@ package Config::Rad::Test;
 use Config::Rad;
 use Test::More ();
 use Test::Fatal;
+use Test::Memory::Cycle;
 use FindBin;
 use Exporter 'import';
 
 our @EXPORT = qw(
     test_err
     test_ok
+    test_for_cycles
     RAD_DEFAULT
     RAD_DEFAULT_NOINC
     RAD_HASH
@@ -32,6 +34,8 @@ do {
         return $self->{obj}->parse_string(@_, topmode => $self->{mode});
     }
 };
+
+my @_test_for_cycles;
 
 my $functions = {
     foo => sub { join '', 'foo', @_ },
@@ -65,12 +69,30 @@ my $rad_array = Config::Rad->new(%common, topmode => 'array');
 my $rad_rt_hash = TestRuntimeMode->new($rad_array, 'hash');
 my $rad_rt_array = TestRuntimeMode->new($rad_hash, 'array');
 
+push @_test_for_cycles,
+    [$rad_default, 'default instance'],
+    [$rad_default_noinc, 'default without include paths'],
+    [$rad_hash, 'hash topmode instance'],
+    [$rad_array, 'array topmode instance'],
+    [$rad_rt_hash, 'runtime hash topmode instance'],
+    [$rad_rt_array, 'runtime array topmode instance'];
+
 sub RAD_DEFAULT () { $rad_default }
 sub RAD_DEFAULT_NOINC () { $rad_default_noinc }
 sub RAD_HASH () { $rad_hash }
 sub RAD_ARRAY () { $rad_array }
 sub RAD_RT_HASH () { $rad_rt_hash }
 sub RAD_RT_ARRAY () { $rad_rt_array }
+
+sub test_for_cycles {
+    my (@custom) = @_;
+    Test::More::subtest 'memory cycles' => sub {
+        for my $test (@_test_for_cycles, @custom) {
+            my ($object, $title) = @$test;
+            memory_cycle_ok($object, $title);
+        }
+    };
+}
 
 sub test_err {
     my ($rad, $group_title, @tests) = @_;
