@@ -252,14 +252,20 @@ be autoquoted and not interpreted as constants.
 
 Examples:
 
-    # $data->{foo} = 23
-    foo 23;
+    # $data->{point} = { x => 23, y => 17 }
+    point {
+        x 23;
+        y 17;
+    };
 
-    # $data->{bar}{baz} = 17
-    bar baz 17;
+    # $data->{limit} = 23
+    limit 23;
 
-    # $data->{ $bar }{ baz() } = 99
-    $bar baz() 99;
+    # $data->{option}{show} = 1
+    option show true;
+
+    # $data->{ $key }{ subkey() } = 99
+    $key subkey() 99;
 
 =head2 Hash Topicalization
 
@@ -293,14 +299,14 @@ as single values. Trying to specify keys will result in an error.
 Examples:
 
     # using semicolons as separators
-    foo [
+    arguments [
         23;
         bar();
         $baz;
     ];
 
     # using commas
-    foo [23, bar(), $baz];
+    arguments [23, bar(), $baz];
 
 =head2 Variables
 
