@@ -176,7 +176,14 @@ sub _make_root_env {
         const => $rt_const || {},
         topic => '_',
     };
-    return { %$env, root => $env };
+    return {
+        %$env,
+        root => $env,
+        var => { %{ $env->{var} } },
+        func => { %{ $env->{func} } },
+        const => { %{ $env->{const} } },
+        templates => {},
+    };
 }
 
 sub _prefixed_variables {

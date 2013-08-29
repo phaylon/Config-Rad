@@ -46,6 +46,11 @@ sub _child_env {
     };
 }
 
+sub _child_root_env {
+    my ($self, $env) = @_;
+    return $self->_child_env({ %{ $env->{root} }, root => $env->{root} });
+}
+
 sub construct {
     my ($self, $tree, $env, %arg) = @_;
     my ($type, $value, $loc) = @$tree;
@@ -336,7 +341,7 @@ sub _handle_load_directive {
         if @rest;
     fail($loc, 'Missing path to file for `@load` directive')
         unless defined $file and length $file;
-    my $load_env = $self->_child_env($env->{root});
+    my $load_env = $self->_child_root_env($env);
     my $file_path = $self->construct($file, $env);
     $self->loader->('nodata', undef, $load_env, $loc, $file_path);
     for my $merge (@_load_merge) {

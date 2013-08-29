@@ -7,6 +7,14 @@ test_ok(RAD_DEFAULT, 'loading',
         { foo => 23 }, 'variable access'],
     ['@load "load-test.conf"; foo testfunc(23)',
         { foo => { testresult => 23 } }, 'function access'],
+    ['@load "load-test-rtvar.conf"; foo rtvar()',
+        { foo => 99 },
+        'runtime variable access',
+        { variables => { rtvar => 99 } }],
+    ['@load "load-test.conf"; foo level2def()',
+        { foo => 99 },
+        'second level include access and definition',
+        { variables => { rtvar => 99 } }],
 );
 
 test_err(RAD_DEFAULT_NOINC, 'loading errors without include paths',
@@ -30,6 +38,10 @@ test_err(RAD_DEFAULT, 'errors in loaded file',
         [qr{Unknown function 'outerfoo'},
             1, qr{conf/load-test-fail-outerenv\.conf}],
         'loading env not available'],
+    ['$outervar = 99; @load "load-test-fail-outervar.conf"; x foo()',
+        [qr{Unknown variable '\$outervar'},
+            1, qr{conf/load-test-fail-outervar\.conf}],
+        'var in loading env not available'],
 );
 
 test_for_cycles;
