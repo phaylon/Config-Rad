@@ -329,14 +329,8 @@ sub _handle_define_directive {
     return 1;
 }
 
-my @_load_merge = (
-    ['func', 'function'],
-    ['template', 'defined function'],
-    ['var', 'variable'],
-);
-
-sub _handle_load_directive {
-    my ($self, $mode, undef, $env, $loc, $file, $args, @rest) = @_;
+sub _include {
+    my ($self, $mode, $struct, $env, $loc, $file, $args, @rest) = @_;
     fail($loc, 'Too many expressions for `@load` directive')
         if @rest;
     fail($loc, 'Missing path to file for `@load` directive')
@@ -350,7 +344,26 @@ sub _handle_load_directive {
         unless ref $args eq 'HASH';
     $load_env->{var}{ '$' . $_ } = $args->{$_}
         for keys %$args;
-    $self->loader->('nodata', undef, $load_env, $loc, $file_path, $args);
+    $self->loader->($mode, $struct, $load_env, $loc, $file_path, $args);
+    return $load_env, $args;
+}
+
+sub _handle_include_directive {
+    my ($self, $mode, $struct, $env, $loc, @rest) = @_;
+    $self->_include($mode, $struct, $env, $loc, @rest);
+    return 1;
+}
+
+my @_load_merge = (
+    ['func', 'function'],
+    ['template', 'defined function'],
+    ['var', 'variable'],
+);
+
+sub _handle_load_directive {
+    my ($self, $mode, undef, $env, $loc, @rest) = @_;
+    my ($load_env, $args)
+        = $self->_include('nodata', undef, $env, $loc, @rest);
     for my $merge (@_load_merge) {
         my ($type, $title) = @$merge;
         for my $name (keys %{ $load_env->{$type} || {} }) {
