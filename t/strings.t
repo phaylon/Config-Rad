@@ -26,6 +26,9 @@ test_ok(RAD_DEFAULT, 'single quoted multiline strings',
     [qq!foo '''  \n  23\n 17\n   99'''!,
         { foo => " 23\n17\n  99" },
         'whitespace on empty opening line'],
+    [qq!foo '''\n  23\n  # foo\n  17\n'''!,
+        { foo => "23\n# foo\n17\n" },
+        'comments inside multiline string'],
 );
 
 test_err(RAD_DEFAULT, 'single quoted string errors',

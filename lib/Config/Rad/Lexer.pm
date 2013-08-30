@@ -59,29 +59,43 @@ my %_escape_qq = (
     '$' => '$',
 );
 
+sub _clean_first_line {
+    my ($self, $lines) = @_;
+    $lines->[0][0] =~ s{\A[ \t]*}{};
+    shift @$lines
+        if @{ $lines->[0] } == 1
+        and $lines->[0][0] eq "\n";
+    return 1;
+}
+
+sub _clean_last_line {
+    my ($self, $lines) = @_;
+    $lines->[-1][-1] =~ s{[ \t]*\z}{};
+    return 1;
+}
+
+sub _clean_indents {
+    my ($self, $lines) = @_;
+    my @lengths =
+        map { $_->[0] =~ m{\A([ ]*)}; length($1) }
+        grep { not(@$_ == 1 and $_->[0] =~ m{\A[ ]*\Z}) }
+        @$lines;
+    my $min_indent = min(@lengths);
+    $_->[0] =~ s{\A[ ]{$min_indent}}{}
+        for @$lines;
+    return 1;
+}
+
 sub _multiline_collapse {
     my ($self, $multi, @lines) = @_;
     return ''
         unless @lines;
     return map { (@$_) } @lines
         unless $multi;
-    $lines[0][0] =~ s{^\s*}{};
-    splice @{ $lines[0] }, 0, 1
-        if @{ $lines[0] } == 1 and $lines[0][0] eq "\n";
-    $lines[-1][-1] =~ s{\s*$}{}
-        unless ref $lines[-1][-1];
-    my $min_indent = min(map {
-        (@$_ == 1 and $_->[0] =~ m{^\s*$}) ? () : do {
-            $_->[0] =~ m{^(\s*)};
-            length($1);
-        };
-    } @lines);
-    return map {
-        my $first = $_->[0];
-        my @rest = @{ $_ }[1 .. $#$_];
-        $first =~ s!^\s{$min_indent}!!;
-        ($first, @rest);
-    } @lines;
+    $self->_clean_first_line(\@lines);
+    $self->_clean_last_line(\@lines);
+    $self->_clean_indents(\@lines);
+    return map { (@$_) } @lines;
 }
 
 sub _tokenize_string_q {
