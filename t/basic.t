@@ -79,6 +79,8 @@ test_err(RAD_DEFAULT, 'generic errors',
     ["foo\nbar\n:\n=\n{}",
         [qr{Unexpected assign token}, 4], 'unexpected multiline'],
     ['? 23', qr{Unable to parse: `\? 23`}, 'unknown char'],
+    ['@fnord',
+        qr{Invalid directive `\@fnord`}, 'unknown directive'],
 );
 
 test_for_cycles(@_test_cycles);
