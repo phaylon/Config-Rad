@@ -40,6 +40,7 @@ my @_tokens = (
     ['separator', qr{,|;}],
     ['topic', ':'],
     ['assign', '='],
+    ['default', '//='],
     ['bareword', $_rx_ident],
     ['variable', qr{ \$ $_rx_ident }x],
     ['number', qr{ -? $_rx_int (?: \. $_rx_int )? }x, check => $_is_num],

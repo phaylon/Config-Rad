@@ -127,6 +127,40 @@ sub _construct_bareword {
     return $value;
 }
 
+sub _call_template {
+    my ($self, $name_str, $template_def, $env, $loc, $get_args) = @_;
+    my ($vars, $template, $sub_env) = @$template_def;
+    my @args = $get_args->();
+    fail($loc, "Too many arguments for '$name_str'")
+        if @args > @$vars;
+    my $call_env = $self->_child_env($sub_env);
+    my $num = 0;
+    for my $var_def (@$vars) {
+        $num++;
+        my ($var, $default, $def_on_undef) = @$var_def;
+        my $arg;
+        if (@args) {
+            $arg = shift @args;
+            if (not(defined $arg) and $def_on_undef) {
+                $arg = $self->construct($default, $call_env);
+            }
+        }
+        else {
+            if ($default) {
+                $arg = $self->construct($default, $call_env);
+            }
+            else {
+                fail($loc,
+                    "Missing required argument $num",
+                    " (`$var`) for '$name_str'",
+                );
+            }
+        }
+        $call_env->{var}{$var} = $arg;
+    }
+    return $self->construct($template, $call_env);
+}
+
 sub _construct_call {
     my ($self, $tree, $env) = @_;
     my ($type, $call, $loc) = @$tree;
@@ -137,27 +171,14 @@ sub _construct_call {
         my $args = $self->construct(['array', $parts, $loc], $args_env);
         return @$args;
     };
-    if (my $template_def = $env->{template}{$name_str}) {
-        my ($vars, $template, $sub_env) = @$template_def;
-        my @args = $get_args->();
-        fail($loc, "Too many arguments for '$name_str'")
-            if @args > @$vars;
-        my $call_env = $self->_child_env($sub_env);
-        my $num = 0;
-        for my $var_def (@$vars) {
-            $num++;
-            my ($var, $default) = @$var_def;
-            my $arg = @args
-                ? shift(@args)
-                : defined($default)
-                ? $self->construct($default, $call_env)
-                : fail($loc,
-                    "Missing required argument $num",
-                    " (`$var`) for '$name_str'",
-                );
-            $call_env->{var}{$var} = $arg;
-        }
-        return $self->construct($template, $call_env);
+    if (my $template = $env->{template}{$name_str}) {
+        return $self->_call_template(
+            $name_str,
+            $template,
+            $env,
+            $loc,
+            $get_args,
+        );
     }
     my $callback = $env->{func}{$name_str}
         || $self->functions->{$name_str}
@@ -199,12 +220,23 @@ sub _construct_variable {
     return $env->{var}{$name};
 }
 
+my %_assign_op = (
+    assign => 1,
+    default => 1,
+);
+
 sub _variable_set {
     my ($self, $items, $env) = @_;
     my (@before, $assign, @after);
+    my $default;
     for my $item (@$items) {
-        if ($item->[0] eq 'assign') {
+        my $type = $item->[0];
+        if ($_assign_op{ $type }) {
+            fail($item->[2], q{Invalid assignment operator position})
+                if $assign;
             $assign = $item;
+            $default = 1
+                if $type eq 'default';
         }
         else {
             if ($assign) {
@@ -224,7 +256,8 @@ sub _variable_set {
     fail($loc, 'Right side of assignment has to be single value')
         unless @after == 1;
     my $var_name = $before[0][1];
-    $env->{var}{ $var_name } = $self->construct($after[0], $env);
+    $env->{var}{ $var_name } = $self->construct($after[0], $env)
+        if not($default) or not(defined $env->{var}{ $var_name });
     return 1;
 }
 
@@ -246,6 +279,7 @@ sub _handle_directive {
 }
 
 my @_seq_assign = qw( variable assign ? );
+my @_seq_default = qw( variable default ? );
 
 sub _destruct_signature {
     my ($self, $outer_loc, $env, $signature) = @_;
@@ -259,7 +293,11 @@ sub _destruct_signature {
     for my $param_idx (0 .. $#$params) {
         my $param_parts = $params->[$param_idx];
         if ($self->_match_sequence($param_parts, @_seq_assign)) {
-            push @vars, [$param_parts->[0][1], $param_parts->[2]];
+            push @vars, [$param_parts->[0][1], $param_parts->[2], 0];
+            $in_optional = 1;
+        }
+        elsif ($self->_match_sequence($param_parts, @_seq_default)) {
+            push @vars, [$param_parts->[0][1], $param_parts->[2], 1];
             $in_optional = 1;
         }
         elsif ($self->_match_sequence($param_parts, 'variable')) {

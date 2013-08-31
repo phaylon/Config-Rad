@@ -331,6 +331,17 @@ Example:
         $key $val;
     };
 
+You can also use the default assignment operator (C<//=>)to set a
+variable only if it isn't yet set to a defined value. This will also
+work if the variable doesn't yet exist.
+
+Example:
+
+    # set $mode to 'default' if it is undefined
+    $mode = get_mode();
+    $mode //= 'default';
+    option mode $mode;
+
 =head2 Strings
 
 =over
@@ -512,6 +523,12 @@ Examples:
     @define foo($n = 23) func($n);
     bar foo();
     baz foo(17);
+
+    # array template with default on undef
+    @define foo($n //= 23);
+    bar foo();
+    baz foo(undef);
+    qux foo(17);
 
 =head2 Loading external definitions
 

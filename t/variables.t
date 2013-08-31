@@ -25,9 +25,34 @@ test_ok(RAD_DEFAULT, 'variables',
         { foo => [23], baz => [17] }, 'equally named variables'],
 );
 
+test_ok(RAD_DEFAULT, 'default assignment',
+    ['$foo //= 23; bar $foo',
+        { bar => 23 }, 'lexical creation'],
+    (map {
+        my ($val, $exp, $title) = @$_;
+        [qq!\$foo = $val; \$foo //= 23; bar \$foo!,
+            { bar => $exp },
+            "default assignment with $title value"],
+    } ['17', 17, 'defined'],
+      ['0', 0, 'false'],
+      ['undef', 23, 'undefined'],
+    ),
+);
+
 test_err(RAD_DEFAULT, 'variable errors',
     ['foo $novar',
         qr{Unknown variable '\$novar'}, 'unknown variable'],
+    (map {
+        my ($ops, $title) = @$_;
+        ["\$foo $ops 23",
+            qr{Invalid assignment operator position},
+            "invalid $title"],
+    } ['= =', 'double assign'],
+      ['==', 'unspaced double assign'],
+      ['//= //=', 'double default'],
+      ['//==', 'default and assign'],
+      ['=//=', 'assign and default'],
+    ),
     (map {
         ["$_ = 23",
             qr{Left side of assignment has to be variable},
