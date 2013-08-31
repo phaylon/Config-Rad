@@ -610,6 +610,40 @@ Example:
 
     @do register($someobj);
 
+=head2 Splicing values
+
+You can inject the contents of hashes and arrays into the current
+context with the C<\@splice> directive. It takes a single argument
+that has to be of the same type as the current mode produces.
+
+Examples:
+
+    # hash splicing
+    $defaults = {
+        limit 25;
+        color 'red';
+    };
+    options {
+        @splice $defaults;
+        color 'blue';
+    };
+
+    # array splicing
+    $prepend = ['foo', 'bar'];
+    identifiers [
+        'first',
+        @splice $prepend;
+        'last',
+    ];
+
+    # call argument splicing
+    $sticky = [23, 17, 99];
+    objects load(
+        @splice $sticky;
+        42,
+        123,
+    );
+
 =head1 METHODS
 
 =head2 new

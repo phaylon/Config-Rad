@@ -367,6 +367,40 @@ sub _handle_define_directive {
     return 1;
 }
 
+sub _directive_args {
+    my ($self, $loc, $name, $args, $req, $max) = @_;
+    fail($loc, qq{Too many expressions for `\@$name` directive})
+        if @$args > $max;
+    for my $req_idx (0 .. $#$req) {
+        my $desc = $req->[$req_idx];
+        fail($loc, qq{Missing $desc for `\@$name` directive})
+            if @$args < ($req_idx + 1);
+    }
+    return 1;
+}
+
+sub _handle_splice_directive {
+    my ($self, $mode, $struct, $env, $loc, @args) = @_;
+    $self->_directive_args($loc, 'splice', \@args, ['spliced value'], 1);
+    my ($expr) = @args;
+    my $value = $self->construct($expr, $env);
+    if ($mode eq 'hash') {
+        fail($loc, 'Can only splice hash references in hash context')
+            unless ref $value eq 'HASH';
+        $struct->{$_} = $value->{$_}
+            for keys %$value;
+    }
+    elsif ($mode eq 'array') {
+        fail($loc, 'Can only splice array references in list context')
+            unless ref $value eq 'ARRAY';
+        push @$struct, @$value;
+    }
+    else {
+        fail($loc, 'Can only splice in hash, list and call contexts');
+    }
+    return 1;
+}
+
 sub _include {
     my ($self, $mode, $struct, $env, $loc, $file, $args, @rest) = @_;
     fail($loc, 'Too many expressions for `@load` directive')
