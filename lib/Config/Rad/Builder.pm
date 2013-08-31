@@ -261,6 +261,18 @@ sub _variable_set {
     return 1;
 }
 
+my $_dirargs = sub {
+    my ($loc, $name, $args, $req, $max) = @_;
+    fail($loc, qq{Too many expressions for `\@$name` directive})
+        if @$args > $max;
+    for my $req_idx (0 .. $#$req) {
+        my $desc = $req->[$req_idx];
+        fail($loc, qq{Missing $desc for `\@$name` directive})
+            if @$args < ($req_idx + 1);
+    }
+    return 1;
+};
+
 sub _handle_directive {
     my ($self, $mode, $part, $struct, $env) = @_;
     return 1
@@ -331,12 +343,9 @@ sub _match_sequence {
 }
 
 sub _handle_topic_directive {
-    my ($self, $mode, $struct, $env, $loc, $expr, @rest) = @_;
-    fail($loc, 'Too many expressions for `@topic` directive')
-        if @rest;
-    fail($loc, 'Missing expression for `@topic` directive')
-        unless $expr;
-    my $topic = $self->construct($expr, $env);
+    my ($self, $mode, $struct, $env, $loc, @args) = @_;
+    $_dirargs->($loc, 'topic', \@args, ['topic key value'], 1);
+    my $topic = $self->construct($args[0], $env);
     fail($loc, 'Value for `@topic` directive must be defined')
         unless defined $topic;
     $env->{topic} = $topic;
@@ -344,44 +353,29 @@ sub _handle_topic_directive {
 }
 
 sub _handle_do_directive {
-    my ($self, $mode, undef, $env, $loc, $expr, @rest) = @_;
-    fail($loc, 'Too many expressions for `@do` directive')
-        if @rest;
-    fail($loc, 'Missing expression for `@do` directive')
-        unless $expr;
-    $self->construct($expr, $env);
+    my ($self, $mode, undef, $env, $loc, @args) = @_;
+    $_dirargs->($loc, 'do', \@args, ['expression'], 1);
+    $self->construct($args[0], $env);
     return 1;
 }
 
 sub _handle_define_directive {
-    my ($self, $mode, undef, $env, $loc, $signature, $template, @rest) = @_;
-    fail($loc, 'Too many expressions for `@define` directive')
-        if @rest;
-    fail($loc, 'Missing call signature for `@define`')
-        unless $signature;
+    my ($self, $mode, undef, $env, $loc, @args) = @_;
+    $_dirargs->(
+        $loc, 'define', \@args,
+        ['call signature', 'template definition'],
+        2,
+    );
+    my ($signature, $template) = @args;
     my ($name, $var) = $self->_destruct_signature($loc, $env, $signature);
-    fail($loc, 'Missing call definition template for `@define`')
-        unless $template;
     my $sub_env = $self->_child_env($env);
     $env->{template}{$name} = [$var, $template, $sub_env];
     return 1;
 }
 
-sub _directive_args {
-    my ($self, $loc, $name, $args, $req, $max) = @_;
-    fail($loc, qq{Too many expressions for `\@$name` directive})
-        if @$args > $max;
-    for my $req_idx (0 .. $#$req) {
-        my $desc = $req->[$req_idx];
-        fail($loc, qq{Missing $desc for `\@$name` directive})
-            if @$args < ($req_idx + 1);
-    }
-    return 1;
-}
-
 sub _handle_splice_directive {
     my ($self, $mode, $struct, $env, $loc, @args) = @_;
-    $self->_directive_args($loc, 'splice', \@args, ['spliced value'], 1);
+    $_dirargs->($loc, 'splice', \@args, ['spliced value'], 1);
     my ($expr) = @args;
     my $value = $self->construct($expr, $env);
     if ($mode eq 'hash') {
@@ -402,13 +396,11 @@ sub _handle_splice_directive {
 }
 
 sub _include {
-    my ($self, $mode, $struct, $env, $loc, $file, $args, @rest) = @_;
-    fail($loc, 'Too many expressions for `@load` directive')
-        if @rest;
-    fail($loc, 'Missing path to file for `@load` directive')
-        unless defined $file and length $file;
+    my ($self, $name, $mode, $struct, $env, $loc, @args) = @_;
+    $_dirargs->($loc, $name, \@args, ['path to file'], 2);
+    my ($file, $args) = @args;
     my $file_path = $self->construct($file, $env);
-    fail($loc, 'Path to file for `@load` directive must be defined')
+    fail($loc, 'Path to file must be defined')
         unless defined $file_path;
     my $load_env = $self->_child_root_env($env);
     $args = (defined($args) ? $self->construct($args, $env) : {});
@@ -422,7 +414,7 @@ sub _include {
 
 sub _handle_include_directive {
     my ($self, $mode, $struct, $env, $loc, @rest) = @_;
-    $self->_include($mode, $struct, $env, $loc, @rest);
+    $self->_include('include', $mode, $struct, $env, $loc, @rest);
     return 1;
 }
 
@@ -435,7 +427,7 @@ my @_load_merge = (
 sub _handle_load_directive {
     my ($self, $mode, undef, $env, $loc, @rest) = @_;
     my ($load_env, $args)
-        = $self->_include('nodata', undef, $env, $loc, @rest);
+        = $self->_include('load', 'nodata', undef, $env, $loc, @rest);
     for my $merge (@_load_merge) {
         my ($type, $title) = @$merge;
         for my $name (keys %{ $load_env->{$type} || {} }) {

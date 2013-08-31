@@ -63,7 +63,7 @@ test_err(RAD_DEFAULT, 'topicalization errors',
 
 test_err(RAD_DEFAULT, '@topic directive errors',
     ['@topic',
-        qr{Missing expression for `\@topic` directive},
+        qr{Missing topic key value for `\@topic` directive},
         'missing expression'],
     ['@topic 23 17',
         qr{Too many expressions for `\@topic` directive},
