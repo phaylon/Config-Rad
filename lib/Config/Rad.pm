@@ -331,14 +331,14 @@ Example:
         $key $val;
     };
 
-You can also use the default assignment operator (C<//=>)to set a
+You can also use the default assignment operator (C<//=>) to set a
 variable only if it isn't yet set to a defined value. This will also
 work if the variable doesn't yet exist.
 
 Example:
 
     # set $mode to 'default' if it is undefined
-    $mode = get_mode();
+    $mode = env('MYAPP_MODE');
     $mode //= 'default';
     option mode $mode;
 
@@ -503,7 +503,7 @@ Examples:
 =head2 Templates
 
 You can define reusable data templates with the C<@define> directive.
-They are declared with a call signature containg names and parameters.
+They are declared with a call signature containing name and parameters.
 Parameters are specified as lexical variables, or variable declarations
 if a default should be available.
 
@@ -613,7 +613,7 @@ Example:
 =head2 Splicing values
 
 You can inject the contents of hashes and arrays into the current
-context with the C<\@splice> directive. It takes a single argument
+context with the C<@splice> directive. It takes a single argument
 that has to be of the same type as the current mode produces.
 
 Examples:
@@ -629,10 +629,10 @@ Examples:
     };
 
     # array splicing
-    $prepend = ['foo', 'bar'];
+    $content = ['foo', 'bar'];
     identifiers [
         'first',
-        @splice $prepend;
+        @splice $content;
         'last',
     ];
 
