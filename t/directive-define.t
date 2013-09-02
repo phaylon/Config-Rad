@@ -29,6 +29,12 @@ test_ok(RAD_DEFAULT, 'templates',
       ['undef', 23, 'undefined value'],
       ['', 23, 'no value'],
     ),
+    ['$foo = 23; @define bar() [$foo = 17; $foo]; x bar(); y $foo',
+        { x => [17], y => 23 },
+        'template unable to change outer var'],
+    ['$foo = 23; @define bar() $foo; $foo = 17; x bar(); y $foo',
+        { x => 23, y => 17 },
+        'unable to change variable in template environment'],
 );
 
 test_err(RAD_DEFAULT, 'template errors',
