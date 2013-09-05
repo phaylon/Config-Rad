@@ -83,6 +83,15 @@ test_err(RAD_DEFAULT, 'generic errors',
         qr{Invalid directive `\@fnord`}, 'unknown directive'],
 );
 
+do {
+    my $rad = Config::Rad->new;
+    push @_test_cycles, [$rad, 'missing source name instance'];
+    my $file = __FILE__;
+    like exception {
+        $rad->parse_string('23');
+    }, qr{\Q$file\E:\d+}, 'no source name';
+};
+
 test_for_cycles(@_test_cycles);
 
 done_testing;
