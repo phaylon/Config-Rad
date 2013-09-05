@@ -216,7 +216,7 @@ Config::Rad - Flexible Configurations
 =head1 DESCRIPTION
 
 This module provides a configuration description language that is
-optimized for loading complex, custom data structures.
+targeted at loading complex, custom data structures.
 
 =head1 CONFIGURATION SYNTAX
 
@@ -276,7 +276,8 @@ Examples:
 
 =head2 Hash topicalization
 
-Hashes can be created in a topicalized manner. You can prefix the
+Hashes can be topicalized, which declaring one key in a prefixed position
+that is more visible. You can prefix the
 hash with a value and a double colon (C<:>) to set that value as topic
 key in the hash.
 
@@ -331,7 +332,7 @@ Example:
         $key $val;
     };
 
-You can also use the default assignment operator (C<//=>) to set a
+You can also use the default assignment operator C<//=> to set a
 variable only if it isn't yet set to a defined value. This will also
 work if the variable doesn't yet exist.
 
@@ -424,7 +425,8 @@ Examples:
 =head2 Function calls
 
 Functions are called with an identifier followed by an argument list
-delimited by C<(> and C<)>.
+delimited by C<(> and C<)>. Functions will always be called in scalar
+context and return a single value.
 
 Examples:
 
@@ -492,7 +494,7 @@ Examples:
     # this is a comment
     ### this is also a comment
 
-    # the following element will be ignored, only C<bar> will exist
+    # the following element will be ignored, only 'bar' will exist
     @@ foo {
         x 23;
     };
@@ -505,7 +507,9 @@ Examples:
 You can define reusable data templates with the C<@define> directive.
 They are declared with a call signature containing name and parameters.
 Parameters are specified as lexical variables, or variable declarations
-if a default should be available.
+if a default should be available. You can use C<=> to use a default
+value when the argument wasn't present, or C<//=> if you want the default
+used if the argument is passed but undefined.
 
 You can invoke a defined template just like you would with a function.
 The environment of the definition will be captured and used when the
@@ -556,7 +560,8 @@ Example:
     value foo($bar);
 
 You can explicitly provide the included file with arguments if you
-want by appending a hash declaration after the file path.
+want by appending a hash declaration after the file path. The arguments
+will be available as variables in the loaded file.
 
 Example:
 
@@ -587,7 +592,7 @@ Example:
     # main.conf
     @include 'inc.conf';
 
-As with C<@load>, you can supply a hash reference containing variables
+As with C<@load>, you can supply a hash reference declaring variables
 that should be available to the included file.
 
 Example:
