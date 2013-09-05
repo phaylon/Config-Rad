@@ -39,10 +39,10 @@ sub _child_env {
     my ($self, $env) = @_;
     return {
         %$env,
-        func => { %{ $env->{func} || {} } },
-        const => { %{ $env->{const} || {} } },
-        template => { %{ $env->{template} || {} } },
-        var => { %{ $env->{var} || {} } },
+        func => { %{ $env->{func} } },
+        const => { %{ $env->{const} } },
+        template => { %{ $env->{template} } },
+        var => { %{ $env->{var} } },
     };
 }
 

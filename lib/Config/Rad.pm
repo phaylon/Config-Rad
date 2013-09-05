@@ -24,7 +24,6 @@ my $_is_mode = sub {
 
 has _topmode => (
     is => 'ro',
-    default => sub { 'hash' },
     init_arg => 'topmode',
     isa => sub {
         die "Must be either 'hash' or 'array'\n"
@@ -132,7 +131,9 @@ sub _tokenize {
 sub _parse {
     my ($self, $source, $source_name, %arg) = @_;
     my $tokens = $self->_tokenize($source, $source_name, %arg);
-    my $mode = $arg{topmode} || $self->_topmode;
+    my $mode = $arg{topmode}
+        || $self->_topmode
+        || 'hash';
     croak q{Invalid topmode: Must be 'hash' or 'array'}
         unless $mode->$_is_mode;
     my $tree = $self->_parser
@@ -174,6 +175,7 @@ sub _make_root_env {
         },
         func => $rt_func || {},
         const => $rt_const || {},
+        template => {},
         topic => '_',
     };
     return {
